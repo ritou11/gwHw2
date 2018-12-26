@@ -31,14 +31,26 @@ n_ref = sum(mpc.bus(:, BUS_TYPE) == 3);
 Bus Type: PQ: 24, PV: 5, REF: 1
     \end{lstlisting}
 
-    对于一个$n=N-1$节点的系统来说，设其中共有$r$个PV节点，则共有$n-r$个PQ节点。
+    对于一个$n=N-1$节点的系统来说，设其中共有$r$个PV节点，则共有$n-r$个PQ节点。在本题中，$n=29,r=5$。
 
     在直角坐标的情况下，待求变量共$2n$个，用
-    $$x=[\vect{e}^T \vect{f}]^T=[e_1,e_2,...,e_n,f_1,f_2,...,f_n]^T$$ 表示，潮流方程为
+    $$x=[\vect{e}^T \quad \vect{f}]^T=[e_1,e_2,...,e_n,f_1,f_2,...,f_n]^T$$ 表示，潮流方程为\cref{eq:pfzj}，共$2n$个等式。本题中，共58个待求变量（包括29个电压实部与29个电压虚部），58个等式。
     \begin{equation}
+      \label{eq:pfzj}
       \begin{cases}
-        \Delta P_i = P^{SP}_i-(e_a a_i+ f_i b_i) = 0 \; i=1,2,...,n\\
-        \Delta Q_i = Q^{SP}_i - (f_i a_i - e_i b_i) = 0 \; i = 1,2,...,n-r\\
+        \Delta P_i = P^{SP}_i-(e_a a_i+ f_i b_i) = 0 \quad i=1,2,...,n\\
+        \Delta Q_i = Q^{SP}_i - (f_i a_i - e_i b_i) = 0 \quad i = 1,2,...,n-r\\
+        \Delta V_i^2 = (V_i^{SP})^2-(e_i^2+f_i^2)=0 \quad i=n-r+1,...,n
+      \end{cases}
+    \end{equation}
+
+    在直角坐标的情况下，待求变量共$2n-r$个，用
+    $$x=[\vect{\theta}^T \quad \vect{V}]^T=[\theta_1,\theta_2,...,\theta_n,V_1,V_2,...,V_{n-r}]^T$$ 表示，潮流方程为\cref{eq:pfjzb}，共$2n-r$个等式，其中$N_i$表示与节点i直接相连的节点编号集合。本题中，共53个待求变量（包括29个相角与24个电压幅值），53个等式。
+    \begin{equation}
+      \label{eq:pfjzb}
+      \begin{cases}
+        \Delta P_i = P^{SP}_i - V_i \sum_{j\in N_i}V_j(G_{ij}\cos \theta_{ij}+B_{ij}\sin \theta_{ij}) = 0 \quad i=1,2,...,n\\
+        \Delta Q_i = Q^{SP}_i - V_i \sum_{j\in N_i}V_j(G_{ij}\sin \theta_{ij}-B_{ij}\cos \theta_{ij}) = 0 \quad i = 1,2,...,n-r\\
       \end{cases}
     \end{equation}
 
