@@ -6,3 +6,10 @@
 [GEN_BUS, PG, QG, QMAX, QMIN, VG, MBASE, GEN_STATUS, PMAX, PMIN, ...
     MU_PMAX, MU_PMIN, MU_QMAX, MU_QMIN, PC1, PC2, QC1MIN, QC1MAX, ...
     QC2MIN, QC2MAX, RAMP_AGC, RAMP_10, RAMP_30, RAMP_Q, APF] = idx_gen;
+mpc = case30();
+%% Watch case30
+n_pq = sum(mpc.bus(:, BUS_TYPE) == 1);
+n_pv = sum(mpc.bus(:, BUS_TYPE) == 2);
+n_ref = sum(mpc.bus(:, BUS_TYPE) == 3);
+
+fprintf('Bus Type: PQ: %d, PV: %d, REF: %d\n', n_pq, n_pv, n_ref);
