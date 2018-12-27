@@ -102,8 +102,7 @@ while (~converged && i < max_it)
 
     %% evalute F(x)
     mis = V .* conj(Ybus * V) - Sbus(Vm);
-    F = [   real(mis(pv));
-            real(mis(pq));
+    F = [   real(mis([pv;pq]));
             imag(mis(pq))   ];
 
     %% check for convergence

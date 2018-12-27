@@ -62,92 +62,111 @@ Bus Type: PQ: 24, PV: 5, REF: 1
     \subsubsection{潮流方程构造}
     \begin{enumerate}
       \item 处理算法的配置。runpf中考虑的配置包括：直流/交流潮流、无功越线情况处理、记录及保存计算结果等。
-      \item 无功越线情况处理。如果开启了无功越线，则runpf程序将对潮流方程多次求解。对于某一次求解结果，如果有PV节点的无功输出超出其限制范围，则将该节点转换为PQ节点（其中无功输出为无功限值），再继续下一次求解，直到没有无功越线的情况出现。根据设置，在出现多个越线节点时，可以选择其中越线最大的节点进行处理，也可以全部进行处理。关键代码如下：
+      \item 计算各节点注入复功率，方法为$S^i=S_{gen}^i-S_{load}^i$。其中，负荷模型可以选择ZIP模型，因此注入功率将成为一个关于电压的函数$S^i(V)$。
       \begin{lstlisting}[style=Matlab-editor,basicstyle=\mlttfamily]
-while (repeat)
-      %% function for computing V dependent complex bus power injections
-      %% (generation - load)
+while (repeat) % 用于后续无功越线情况迭代
+      %% 匿名函数，表征节点注入功率与电压的关系
       Sbus = @(Vm)makeSbus(baseMVA, bus, gen, mpopt, Vm);
+      %% 调用NR法求解潮流方程
       [V, success, iterations] = newtonpf(Ybus, Sbus, V0, ref, pv, pq, mpopt);
-      its = its + iterations;
-      %% update data matrices with solution
+      %% 将潮流计算结果更新到模型中
       [bus, gen, branch] = pfsoln(baseMVA, bus, gen, branch, Ybus, Yf, Yt, V, ref, pv, pq, mpopt);
-      if qlim             %% enforce generator Q limits
-          %% find gens with violated Q constraints
-          mx = find( gen(:, GEN_STATUS) > 0 ...
-                  & gen(:, QG) > gen(:, QMAX) + mpopt.opf.violation );
-          mn = find( gen(:, GEN_STATUS) > 0 ...
-                  & gen(:, QG) < gen(:, QMIN) - mpopt.opf.violation );
-
-          if ~isempty(mx) || ~isempty(mn)  %% we have some Q limit violations
-              %% 检查系统的收敛性
-              infeas = union(mx', mn')';
-              remaining = find( gen(:, GEN_STATUS) > 0 & ...
-                              ( bus(gen(:, GEN_BUS), BUS_TYPE) == PV | ...
-                                bus(gen(:, GEN_BUS), BUS_TYPE) == REF ));
-              if length(infeas) == length(remaining) && all(infeas == remaining) && ...
-                      (isempty(mx) || isempty(mn))
-                  %% 若所有剩余的PV节点与REF节点都同时越上限或下限，则该系统无解
-                  success = 0;
-                  break;
-              end
-
-              %% 如果设置，每次只处理一个节点
-              if qlim == 2    %% 选择越线幅度最大的节点
-                  [junk, k] = max([gen(mx, QG) - gen(mx, QMAX);
-                                   gen(mn, QMIN) - gen(mn, QG)]);
-                  if k > length(mx)
-                      mn = mn(k-length(mx));
-                      mx = [];
-                  else
-                      mx = mx(k);
-                      mn = [];
-                  end
-              end
-
-              %% save corresponding limit values
-              fixedQg(mx) = gen(mx, QMAX);
-              fixedQg(mn) = gen(mn, QMIN);
-              mx = [mx;mn];
-
-              %% convert to PQ bus
-              %% 关闭发动机并在节点上引入等效的PQ负荷
-              gen(mx, QG) = fixedQg(mx);      %% set Qg to binding limit
-              gen(mx, GEN_STATUS) = 0;        %% temporarily turn off gen,
-              for i = 1:length(mx)            %% (one at a time, since
-                  bi = gen(mx(i), GEN_BUS);   %%  they may be at same bus)
-                  bus(bi, [PD,QD]) = ...      %% adjust load accordingly,
-                      bus(bi, [PD,QD]) - gen(mx(i), [PG,QG]);
-              end
-              if length(ref) > 1 && any(bus(gen(mx, GEN_BUS), BUS_TYPE) == REF)
-                  %% 无法处理多松弛节点系统的松弛节点无功越线问题
-                  error('runpf: Sorry, MATPOWER cannot enforce Q limits for slack buses in systems with multiple slacks.');
-              end
-              bus(gen(mx, GEN_BUS), BUS_TYPE) = PQ;   %% 调整节点类型
-
-              %% update bus index lists of each type of bus
-              ref_temp = ref;
-              [ref, pv, pq] = bustypes(bus, gen);
-              %% previous line can modify lists to select new REF bus
-              %% if there was none, so we should update bus with these
-              %% just to keep them consistent
-              if ref ~= ref_temp
-                  bus(ref, BUS_TYPE) = REF;
-                  bus( pv, BUS_TYPE) = PV;
-                  %% 设置新的参考（松弛）节点
-              end
-              limited = [limited; mx];
-          else
-              repeat = 0; %% 停止迭代
-          end
-      else
-          repeat = 0; %% 停止迭代
-      end
+    \end{lstlisting}
+      \item 无功越线情况处理。如果开启了无功越线，则runpf程序将对潮流方程多次求解。对于某一次求解结果，如果有PV节点的无功输出超出其限制范围，则将该节点转换为PQ节点（其中无功输出为无功限值），再继续下一次求解，直到没有无功越线的情况出现。根据设置，在出现多个越线节点时，可以选择其中越线最大的节点进行处理，也可以全部进行处理。
+      若判断开启无功越线情况处理，则执行以下代码，根据当次潮流计算结果，处理越线节点；否则不再迭代。
+    \begin{lstlisting}[style=Matlab-editor,basicstyle=\mlttfamily]
+%% 提取所有越线节点，并按照越上限、越下限分别存入mx、mn中。
+% 代码略
+if ~isempty(mx) || ~isempty(mn)  %% 如果存在越线情况
+    %% 检查系统的收敛性，代码略
+    if length(infeas) == length(remaining) && all(infeas == remaining) && ...
+            (isempty(mx) || isempty(mn))
+        %% 若所有剩余的PV节点与REF节点都同时越上限或下限，则该系统无解
+        success = 0;
+        break;
+    end
+    %% 如果设置每次只处理一个节点
+    if qlim == 2    %% 则选择越线幅度最大的节点，代码略
+    end
+    %% 保存相应越线限制，并将mn并入mx中，代码略
+    %% convert to PQ bus
+    %% 关闭发动机并在节点上引入等效的PQ负荷
+    gen(mx, QG) = fixedQg(mx);      %% set Qg to binding limit
+    gen(mx, GEN_STATUS) = 0;        %% temporarily turn off gen,
+    for i = 1:length(mx)            %% (one at a time, since
+        bi = gen(mx(i), GEN_BUS);   %%  they may be at same bus)
+        bus(bi, [PD,QD]) = ...      %% adjust load accordingly,
+            bus(bi, [PD,QD]) - gen(mx(i), [PG,QG]);
+    end
+    if length(ref) > 1 && any(bus(gen(mx, GEN_BUS), BUS_TYPE) == REF)
+        %% 无法处理多松弛节点系统的松弛节点无功越线问题，代码略
+    end
+    bus(gen(mx, GEN_BUS), BUS_TYPE) = PQ;   %% 调整节点类型
+    %% 更新各个类型节点列表
+    ref_temp = ref;
+    [ref, pv, pq] = bustypes(bus, gen);
+    if ref ~= ref_temp
+        bus(ref, BUS_TYPE) = REF;
+        bus( pv, BUS_TYPE) = PV;
+        %% 设置新的参考（松弛）节点
+    end
+    %% 记录限制过的节点
+    limited = [limited; mx];
+else
+    repeat = 0; %% 停止迭代
+end
   end
       \end{lstlisting}
     \end{enumerate}
     \subsubsection{潮流方程求解}
-
+    \begin{enumerate}
+      \item 本程序采用了极坐标形式列写潮流方程，如\cref{eq:pfjzb}所示，变量为电压幅值与相角。
+      \item 潮流计算的初值为模型给定的初值，由于输入是复电压形式，直接取幅值及相角即可。
+      \begin{lstlisting}[style=Matlab-editor,basicstyle=\mlttfamily]
+Va = angle(V);
+Vm = abs(V);
+      \end{lstlisting}
+      \item 迭代格式。牛拉法的迭代核心思想为在当前点附近的一阶泰勒展开，确定下降方向。迭代格式如\cref{eq:nr}所示。
+\begin{equation}
+  \label{eq:nr}
+  \begin{cases}
+    \Delta \vect{x}^{(k)} = -\vect{J}(\vect{x}^{(k)})^{-1}\vect{f}(\vect{x}^{(k)})\\
+    \vect{x}^{(k+1)}=\vect{x}^{(k)}+\Delta \vect{x}^{(k)}
+  \end{cases}
+\end{equation}
+      其中$\vect{J}=\frac{\partial \vect{f}}{\partial \vect{x}^T}$为雅克比矩阵。
+      \item 误差矩阵计算。改写\cref{eq:pfjzb}的潮流方程为
+      \begin{equation}
+        f(x) = \begin{pmatrix}
+          \vect{P}^{SP}-\vect{P}(\vect{\theta},\vect{V})\\
+          \vect{Q}^{SP}-\vect{Q}(\vect{\theta},\vect{V})
+      \end{pmatrix} = 0
+      \end{equation}
+      而通过网络方程可知，
+      \begin{equation}
+        \vect{S}=\vect{V}\overline{\vect{YV}}=\vect{P}+j\vect{Q}
+      \end{equation}
+      因此通过以下代码构造误差矩阵，
+      \begin{lstlisting}[style=Matlab-editor,basicstyle=\mlttfamily]
+mis = V .* conj(Ybus * V) - Sbus(Vm);
+F = [   real(mis([pv; pq]));
+        imag(mis(pq))   ];
+      \end{lstlisting}
+      \item 雅克比矩阵计算。
+      \item 收敛条件。
+      使用收敛条件为
+      \begin{equation}
+        \parallel f(x) \parallel_\infty < \varepsilon
+      \end{equation}
+      其中$\varepsilon$为一给定的容差值。程序中体现为
+      \begin{lstlisting}[style=Matlab-editor,basicstyle=\mlttfamily]
+normF = norm(F, inf);
+if normF < tol
+    converged = 1;
+end
+      \end{lstlisting}
+      \item PQ失配量处理
+    \end{enumerate}
 
     \section{分布因子与矫正控制}
     \subsection{题目1 分布因子计算}
@@ -179,5 +198,8 @@ while (repeat)
 \begin{multicols}{2}
 %two columns
 \end{multicols}
+\begin{lstlisting}[style=Matlab-editor,basicstyle=\mlttfamily]
+
+\end{lstlisting}
 \fi
 \end{document}
