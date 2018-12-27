@@ -116,7 +116,7 @@ mpc = ext2int(mpc);
 on = find(gen(:, GEN_STATUS) > 0);      %% which generators are on?
 gbus = gen(on, GEN_BUS);                %% what buses are they at?
 
-%%-----  run the power flow  -----
+%% -----  run the power flow  -----
 t0 = clock;
 its = 0;            %% total iterations
 if mpopt.verbose > 0

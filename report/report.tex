@@ -55,7 +55,99 @@ Bus Type: PQ: 24, PV: 5, REF: 1
     \end{equation}
 
     \subsection{题目2 程序解释}
-    \paragraph{题目描述} 仔细阅读runpf函数及matpower手册，解释matpower在求解潮流方程时各步骤的原理。尝试使用N-R方法（newtonpf）进行潮流方程的求解。注意其对节点类型、边界条件的处理方法，分析并探讨N-R 方法算法流程、雅克比矩阵、PQ失配量的处理方法，并学习其中的编程技巧。
+    \paragraph{题目描述} 仔细阅读runpf函数及matpower手册，解释matpower在求解潮流方程时各步骤的原理。尝试使用N-R方法（newtonpf）进行潮流方程的求解。注意其对节点类型、边界条件的处理方法，分析并探讨N-R方法算法流程、雅克比矩阵、PQ失配量的处理方法，并学习其中的编程技巧。
+
+    经过对runpf函数的研读，发现MATPOWER在计算电力系统潮流时考虑了各种情况，虽然程序结构比较复杂，但总体上可以分为潮流方程构造与潮流方程求解两部分，并进行了一定的迭代。下面从这两方面依次说明，由于本题的重点在于潮流方程的求解，因此相关部分将重点说明。
+
+    \subsubsection{潮流方程构造}
+    \begin{enumerate}
+      \item 处理算法的配置。runpf中考虑的配置包括：直流/交流潮流、无功越线情况处理、记录及保存计算结果等。
+      \item 无功越线情况处理。如果开启了无功越线，则runpf程序将对潮流方程多次求解。对于某一次求解结果，如果有PV节点的无功输出超出其限制范围，则将该节点转换为PQ节点（其中无功输出为无功限值），再继续下一次求解，直到没有无功越线的情况出现。根据设置，在出现多个越线节点时，可以选择其中越线最大的节点进行处理，也可以全部进行处理。关键代码如下：
+      \begin{lstlisting}[style=Matlab-editor,basicstyle=\mlttfamily]
+while (repeat)
+      %% function for computing V dependent complex bus power injections
+      %% (generation - load)
+      Sbus = @(Vm)makeSbus(baseMVA, bus, gen, mpopt, Vm);
+      [V, success, iterations] = newtonpf(Ybus, Sbus, V0, ref, pv, pq, mpopt);
+      its = its + iterations;
+      %% update data matrices with solution
+      [bus, gen, branch] = pfsoln(baseMVA, bus, gen, branch, Ybus, Yf, Yt, V, ref, pv, pq, mpopt);
+      if qlim             %% enforce generator Q limits
+          %% find gens with violated Q constraints
+          mx = find( gen(:, GEN_STATUS) > 0 ...
+                  & gen(:, QG) > gen(:, QMAX) + mpopt.opf.violation );
+          mn = find( gen(:, GEN_STATUS) > 0 ...
+                  & gen(:, QG) < gen(:, QMIN) - mpopt.opf.violation );
+
+          if ~isempty(mx) || ~isempty(mn)  %% we have some Q limit violations
+              %% 检查系统的收敛性
+              infeas = union(mx', mn')';
+              remaining = find( gen(:, GEN_STATUS) > 0 & ...
+                              ( bus(gen(:, GEN_BUS), BUS_TYPE) == PV | ...
+                                bus(gen(:, GEN_BUS), BUS_TYPE) == REF ));
+              if length(infeas) == length(remaining) && all(infeas == remaining) && ...
+                      (isempty(mx) || isempty(mn))
+                  %% 若所有剩余的PV节点与REF节点都同时越上限或下限，则该系统无解
+                  success = 0;
+                  break;
+              end
+
+              %% 如果设置，每次只处理一个节点
+              if qlim == 2    %% 选择越线幅度最大的节点
+                  [junk, k] = max([gen(mx, QG) - gen(mx, QMAX);
+                                   gen(mn, QMIN) - gen(mn, QG)]);
+                  if k > length(mx)
+                      mn = mn(k-length(mx));
+                      mx = [];
+                  else
+                      mx = mx(k);
+                      mn = [];
+                  end
+              end
+
+              %% save corresponding limit values
+              fixedQg(mx) = gen(mx, QMAX);
+              fixedQg(mn) = gen(mn, QMIN);
+              mx = [mx;mn];
+
+              %% convert to PQ bus
+              %% 关闭发动机并在节点上引入等效的PQ负荷
+              gen(mx, QG) = fixedQg(mx);      %% set Qg to binding limit
+              gen(mx, GEN_STATUS) = 0;        %% temporarily turn off gen,
+              for i = 1:length(mx)            %% (one at a time, since
+                  bi = gen(mx(i), GEN_BUS);   %%  they may be at same bus)
+                  bus(bi, [PD,QD]) = ...      %% adjust load accordingly,
+                      bus(bi, [PD,QD]) - gen(mx(i), [PG,QG]);
+              end
+              if length(ref) > 1 && any(bus(gen(mx, GEN_BUS), BUS_TYPE) == REF)
+                  %% 无法处理多松弛节点系统的松弛节点无功越线问题
+                  error('runpf: Sorry, MATPOWER cannot enforce Q limits for slack buses in systems with multiple slacks.');
+              end
+              bus(gen(mx, GEN_BUS), BUS_TYPE) = PQ;   %% 调整节点类型
+
+              %% update bus index lists of each type of bus
+              ref_temp = ref;
+              [ref, pv, pq] = bustypes(bus, gen);
+              %% previous line can modify lists to select new REF bus
+              %% if there was none, so we should update bus with these
+              %% just to keep them consistent
+              if ref ~= ref_temp
+                  bus(ref, BUS_TYPE) = REF;
+                  bus( pv, BUS_TYPE) = PV;
+                  %% 设置新的参考（松弛）节点
+              end
+              limited = [limited; mx];
+          else
+              repeat = 0; %% 停止迭代
+          end
+      else
+          repeat = 0; %% 停止迭代
+      end
+  end
+      \end{lstlisting}
+    \end{enumerate}
+    \subsubsection{潮流方程求解}
+
 
     \section{分布因子与矫正控制}
     \subsection{题目1 分布因子计算}

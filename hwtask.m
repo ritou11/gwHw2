@@ -13,3 +13,5 @@ n_pv = sum(mpc.bus(:, BUS_TYPE) == 2);
 n_ref = sum(mpc.bus(:, BUS_TYPE) == 3);
 
 fprintf('Bus Type: PQ: %d, PV: %d, REF: %d\n', n_pq, n_pv, n_ref);
+%% pf case30
+res = runpf(mpc, mpoption('pf.alg', 'nr'), 'meta/case30pf_nr.log', 'meta/case30pf_nr');
