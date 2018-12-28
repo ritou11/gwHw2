@@ -24,16 +24,27 @@ branchp = @(x)(x.branch(:, PF) - x.branch(:, PT)) / 2;
 org_brp = branchp(res);
 %% 当位于2号节点的发电机有功出力减小0.1、1与10时
 %% -0.1
-fprintf('-0.1 Error: %s\n', q1s1(res, exp_ptdf, 0.1));
+fprintf('-0.1 Error: %.2f%%\n', q1s1(res, exp_ptdf, 0.1) * 100);
 %% -1
-fprintf('-1 Error: %s\n', q1s1(res, exp_ptdf, 1));
+fprintf('-1 Error: %.2f%%\n', q1s1(res, exp_ptdf, 1) * 100);
 %% -10
-fprintf('-10 Error: %s\n', q1s1(res, exp_ptdf, 10));
+fprintf('-10 Error: %.2f%%\n', q1s1(res, exp_ptdf, 10) * 100);
 %% 当位于2号节点的发电机有功出力减小0.1、1与10且位于13号节点的发电机有功出力相应增加0.1、1与10以使系统总调整量为0时。
 %% -0.1
-fprintf('-0.1 Error: %s\n', q1s2(res, exp_ptdf, 0.1));
+fprintf('-0.1 Error: %.2f%%\n', q1s2(res, exp_ptdf, 0.1) * 100);
 %% -1
-fprintf('-1 Error: %s\n', q1s2(res, exp_ptdf, 1));
+fprintf('-1 Error: %.2f%%\n', q1s2(res, exp_ptdf, 1) * 100);
 %% -10
-fprintf('-10 Error: %s\n', q1s2(res, exp_ptdf, 10));
+fprintf('-10 Error: %.2f%%\n', q1s2(res, exp_ptdf, 10) * 100);
 %% Q2
+node = 27;
+target = find(res.gen(:, GEN_BUS) == node); % find the gen
+abr = find((res.branch(:, F_BUS) == 27 & res.branch(:, T_BUS) == 28) ...
+    | (res.branch(:, F_BUS) == 28 & res.branch(:, T_BUS) == 27));
+adjust_amount = - 0.1 / exp_ptdf(abr, node);
+md = res;
+md.gen(target, PG) = md.gen(target, PG) + adjust_amount; 
+mdres = runpf(md, mpoption('pf.alg', 'nr','verbose', 0));
+dbrp = (mdres.branch(abr, PF) - mdres.branch(abr, PT) - (res.branch(abr, PF) - res.branch(abr, PT))) / 2;
+err = (dbrp + 0.1) / -0.1;
+fprintf('Error: %.2f%%\n', err * 100);
