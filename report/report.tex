@@ -144,7 +144,10 @@ Vm = abs(V);
       \end{equation}
       而通过网络方程可知，
       \begin{equation}
-        \vect{S}=\vect{V}\overline{\vect{YV}}=\vect{P}+j\vect{Q}
+        \begin{aligned}
+          \vect{\dot{I}} &= \vect{Y\dot{V}}\\
+          \vect{S}&=diag(\vect{\dot{V}})\overline{\dot{I}}=\vect{\dot{V}}\overline{\vect{Y\dot{V}}}=\vect{P}+j\vect{Q}
+        \end{aligned}
       \end{equation}
       因此通过以下代码构造误差矩阵，
       \begin{lstlisting}[style=Matlab-editor,basicstyle=\mlttfamily]
@@ -152,7 +155,63 @@ mis = V .* conj(Ybus * V) - Sbus(Vm);
 F = [   real(mis([pv; pq]));
         imag(mis(pq))   ];
       \end{lstlisting}
-      \item 雅克比矩阵计算。
+      \item 雅克比矩阵计算。为了计算雅克比矩阵，首先应计算复功率关于电压幅值、相角的偏导数，如 \cref{eq:partialv,eq:partialtheta} 所示。
+      \begin{equation}
+        \label{eq:partialv}
+        \begin{aligned}
+          \frac{\partial \vect{\dot{V}}}{\partial \vect{V}^T}&=diag(\left[\frac{\dot{V}_i}{V_i}\right])\\
+          \frac{\partial \vect{\dot{I}}}{\partial \vect{V}^T}&=Y\cdot diag(\left[\frac{\dot{V}_i}{V_i}\right])\\
+          \frac{\partial \vect{S}}{\partial \vect{V}^T} &=diag(\vect{\dot{V}})\overline{\frac{\partial \vect{\dot{I}}}{\partial \vect{V}^T}} + diag(\overline{\dot{I}})\frac{\partial \vect{\dot{V}}}{\partial \vect{V}^T}
+        \end{aligned}
+      \end{equation}
+      \begin{equation}
+        \label{eq:partialtheta}
+        \begin{aligned}
+          \frac{\partial \vect{\dot{V}}}{\partial \vect{\theta}^T}&=j\cdot diag(\vect{\dot{V}})\\
+          \frac{\partial \vect{\dot{I}}}{\partial \vect{\theta}^T}&=jY\cdot diag(\vect{\dot{V}})\\
+          \frac{\partial \vect{S}}{\partial \vect{\theta}^T} &=diag(\vect{\dot{V}})\overline{\frac{\partial \vect{\dot{I}}}{\partial \vect{\theta}^T}} + diag(\overline{\dot{I}})\frac{\partial \vect{\dot{V}}}{\partial \vect{\theta}^T}
+        \end{aligned}
+      \end{equation}
+
+      求出复功率对电压幅值、相角的偏导后，容易分解出有功、无功对电压幅值、相角的偏导，如 \cref{eq:pqpartial} 所示。
+      \begin{equation}
+        \label{eq:pqpartial}
+        \begin{aligned}
+          \frac{\partial \vect{S}}{\partial \vect{V}^T} &= \frac{\partial \vect{P}}{\partial \vect{V}^T} + j \frac{\partial \vect{Q}}{\partial \vect{V}^T}\\
+          \frac{\partial \vect{S}}{\partial \vect{\theta}^T} &= \frac{\partial \vect{P}}{\partial \vect{\theta}^T} + j \frac{\partial \vect{Q}}{\partial \vect{\theta}^T}\\
+        \end{aligned}
+      \end{equation}
+
+      重排以上偏导数，即可得到雅克比矩阵，如 \cref{eq:jacobi} 所示。
+      \begin{equation}
+        \label{eq:jacobi}
+        J=\begin{pmatrix}
+          \frac{\partial \vect{P}}{\partial \vect{\theta}^T} & \frac{\partial \vect{P}}{\partial \vect{V}^T}\\
+          \frac{\partial \vect{Q}}{\partial \vect{\theta}^T} & \frac{\partial \vect{Q}}{\partial \vect{V}^T}
+      \end{pmatrix}
+      \end{equation}
+
+      如果负荷采用ZIP模型，则也会对雅克比矩阵产生影响。以上步骤体现在程序中，即为以下代码。
+      \begin{lstlisting}[style=Matlab-editor,basicstyle=\mlttfamily]
+%% 计算偏导数
+Ibus = Ybus * V;
+diagV       = diag(V);
+diagIbus    = diag(Ibus);
+diagVnorm   = diag(V./abs(V));
+dSbus_dVm = diagV * conj(Ybus * diagVnorm) + conj(diagIbus) * diagVnorm;
+dSbus_dVa = 1j * diagV * conj(diagIbus - Ybus * diagV);
+%% 计算负荷模型的偏导数
+[dummy, neg_dSd_dVm] = Sbus(Vm);
+%% 修正偏导数
+dSbus_dVm = dSbus_dVm - neg_dSd_dVm;
+%% 组成雅克比矩阵
+j11 = real(dSbus_dVa([pv; pq], [pv; pq]));
+j12 = real(dSbus_dVm([pv; pq], pq));
+j21 = imag(dSbus_dVa(pq, [pv; pq]));
+j22 = imag(dSbus_dVm(pq, pq));
+J = [   j11 j12;
+        j21 j22;    ];
+      \end{lstlisting}
       \item 收敛条件。
       使用收敛条件为
       \begin{equation}
@@ -165,7 +224,6 @@ if normF < tol
     converged = 1;
 end
       \end{lstlisting}
-      \item PQ失配量处理
     \end{enumerate}
 
     \section{分布因子与矫正控制}
