@@ -352,8 +352,9 @@ if fname
         fclose(fd);
     end
 end
-printpf(results, 1, mpopt);
-
+if mpopt.verbose > 0
+    printpf(results, 1, mpopt);
+end
 %% save solved case
 if solvedcase
     savecase(solvedcase, results);

@@ -19,3 +19,21 @@ res = runpf(mpc, mpoption('pf.alg', 'nr'), 'meta/case30pf_nr.log', 'meta/case30p
 mp_ptdf = makePTDF(res);
 exp_ptdf = expPTDF(res);
 fprintf('Calc error: %s\n', norm(mp_ptdf-exp_ptdf));
+%% Q1
+branchp = @(x)(x.branch(:, PF) - x.branch(:, PT)) / 2;
+org_brp = branchp(res);
+%% 当位于2号节点的发电机有功出力减小0.1、1与10时
+%% -0.1
+fprintf('-0.1 Error: %s\n', q1s1(res, exp_ptdf, 0.1));
+%% -1
+fprintf('-1 Error: %s\n', q1s1(res, exp_ptdf, 1));
+%% -10
+fprintf('-10 Error: %s\n', q1s1(res, exp_ptdf, 10));
+%% 当位于2号节点的发电机有功出力减小0.1、1与10且位于13号节点的发电机有功出力相应增加0.1、1与10以使系统总调整量为0时。
+%% -0.1
+fprintf('-0.1 Error: %s\n', q1s2(res, exp_ptdf, 0.1));
+%% -1
+fprintf('-1 Error: %s\n', q1s2(res, exp_ptdf, 1));
+%% -10
+fprintf('-10 Error: %s\n', q1s2(res, exp_ptdf, 10));
+%% Q2
