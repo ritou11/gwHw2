@@ -230,6 +230,40 @@ end
     \subsection{题目1 分布因子计算}
     \paragraph{题目描述} 试用课本上学习的方法计算发电机输出功率转移分布因子，并与makePTDF函数的计算结果进行比对。
 
+    根据教材【TODO】，分布因子的计算公式为
+    \begin{equation}
+      \label{eq:fbyz}
+      \begin{aligned}
+        &G_{k-i}=\frac{X_{mi}-X_{ni}}{x_k}\\
+        &\vect{G}= diag(\left[\frac{1}{x_k}\right])\cdot \vect{A}^T \cdot \vect{B}^{-1}
+      \end{aligned}
+    \end{equation}
+    其中$\vect{X}$矩阵为直流潮流中的$\vect{B}$矩阵的逆，表达见\cref{eq:zlcl}，$x_k$为第k条支路的电抗。
+    \begin{equation}
+      \label{eq:zlcl}
+      \begin{aligned}
+        &\begin{cases}
+          \vect{B}_{ii}&=\sum_{j\in N_i}\frac{1}{x_{ij}}\\
+          \vect{B}_{ij}&=-\frac{1}{x_{ij}}
+        \end{cases}\\
+        &\vect{B}=\vect{A}\cdot diag(\left[\frac{1}{x_k}\right]) \cdot \vect{A}^T
+      \end{aligned}
+    \end{equation}
+    其中$N_i$为节点i的邻居节点集合，$x_{ij}$为节点ij之间的电抗，$\vect{A}$为节点支路关联矩阵。此处$\vect{A},\vect{B}$均不包括平衡节点。
+
+    采用本方法的计算代码见附录，如\cref{lst:expPTDF}所示。以下代码测试了本方法与makePTDF的差距：
+    \begin{lstlisting}[style=Matlab-editor,basicstyle=\mlttfamily]
+%% PTDF
+mp_ptdf = makePTDF(res);
+exp_ptdf = expPTDF(res);
+fprintf('Calc error: %s\n', norm(mp_ptdf-exp_ptdf));
+    \end{lstlisting}
+    结果输出为：
+    \begin{lstlisting}[style=Matlab-editor,basicstyle=\mlttfamily]
+Calc error: 1.523481e-14
+    \end{lstlisting}
+    表明结果正确。
+
     \subsection{题目2 边界条件变化估算}
     \paragraph{题目描述} 利用分布因子方法估算潮流方程边界条件发生变化时的各线路潮流分布情况，并与在调整后边界条件下的潮流计算结果进行对比，探讨其中的差别与产生的原因。请根据以下场景进行计算：
     \subsubsection{场景1} 当位于2号节点的发电机有功出力减小0.1、1与10时。
@@ -245,6 +279,7 @@ end
     \appendix
     \section{程序清单}
       \lstinputlisting[style=Matlab-editor,basicstyle=\mlttfamily,label=lst:hwtask,caption={全部作业任务}]{../hwtask.m}
+      \lstinputlisting[style=Matlab-editor,basicstyle=\mlttfamily,label=lst:expPTDF,caption={发电机有功功率转移分布因子计算}]{../expPTDF.m}
     \label{applastpage}
 \iffalse
 \begin{itemize}[noitemsep,topsep=0pt]

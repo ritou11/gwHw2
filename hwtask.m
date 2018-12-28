@@ -15,3 +15,7 @@ n_ref = sum(mpc.bus(:, BUS_TYPE) == 3);
 fprintf('Bus Type: PQ: %d, PV: %d, REF: %d\n', n_pq, n_pv, n_ref);
 %% pf case30
 res = runpf(mpc, mpoption('pf.alg', 'nr'), 'meta/case30pf_nr.log', 'meta/case30pf_nr');
+%% PTDF
+mp_ptdf = makePTDF(res);
+exp_ptdf = expPTDF(res);
+fprintf('Calc error: %s\n', norm(mp_ptdf-exp_ptdf));
