@@ -323,7 +323,36 @@ Calc error: 1.523481e-14
     \subsection{题目3 矫正控制策略}
     \paragraph{题目描述} 利用分布因子方法计算为达到所期望的控制效果所需的矫正控制策略，并与在调整后边界条件下的潮流计算结果进行对比，探讨两者的差别与产生的原因。请根据以下场景进行计算：
     \subsubsection{场景1} 只调节位于27号节点的发电机的有功出力，其他机组有功出力不变，以使线路27-28上的有功功率降低0.1。
+
+    利用分布因子，为了调整线路27-28上的有功功率，只需要将27号节点的发电机功率按照比例相应调整即可，与题目2类似。设目标线路调整量为$d$，则节点调整量$p$的计算方式为\cref{eq:q3tz}。
+    \begin{equation}
+      \label{eq:q3tz}
+      p = \frac{d}{G_{i-k}}
+    \end{equation}
+    程序见附录，如\cref{lst:q2}所示。计算结果为：
+    \begin{lstlisting}[style=Matlab-editor,basicstyle=\mlttfamily]
+Error: 6.96%
+    \end{lstlisting}
+    即实际调整量相对预期调整量-0.1有6.96\%的误差。误差的出现，是因为直流潮流模型在此处存在误差，主要是忽略线路网损的近似导致的。
+
     \subsubsection{场景2} 请设计一种方案，选取一对节点并同时调节节点上发电机对的有功出力，以使线路27-28上的有功功率降低0.1。
+    此处需向相反方向调整同样的数值，以保证全网的有功出力不变。设两节点编号为$i,j$，则节点$i,j$的调整量为
+    \begin{equation}
+      \label{eq:q3ij}
+      \begin{aligned}
+        p_i &= \frac{d}{G_{i-k} - G_{j-k}}\\
+        p_j &= - p_i
+      \end{aligned}
+    \end{equation}
+
+    一种基本的节点对选取方式为，选取对目标线路分布因子最大的节点和最小的节点，这样可以使得调整量最小。这样的节点选取程序为
+    \begin{lstlisting}[style=Matlab-editor,basicstyle=\mlttfamily]
+[maxdf, maxdfgen] = max(exp_ptdf(abr, md.gen(:, GEN_BUS)));
+[mindf, mindfgen] = min(exp_ptdf(abr, md.gen(:, GEN_BUS)));
+    \end{lstlisting}
+    计算这种调节方式带来的误差，结果为6.94\%。
+
+    当然，根据我们在
 
     \bibliography{report}
     \bibliographystyle{ieeetr}
@@ -333,6 +362,8 @@ Calc error: 1.523481e-14
       \lstinputlisting[style=Matlab-editor,basicstyle=\mlttfamily,label=lst:expPTDF,caption={发电机有功功率转移分布因子计算}]{../expPTDF.m}
       \lstinputlisting[style=Matlab-editor,basicstyle=\mlttfamily,label=lst:q1s1,caption={分布因子与矫正控制题目2场景1}]{../q1s1.m}
       \lstinputlisting[style=Matlab-editor,basicstyle=\mlttfamily,label=lst:q1s2,caption={分布因子与矫正控制题目2场景2}]{../q1s2.m}
+      \lstinputlisting[style=Matlab-editor,basicstyle=\mlttfamily,label=lst:q2,caption={分布因子与矫正控制题目3}]{../q2.m}
+      \lstinputlisting[style=Matlab-editor,basicstyle=\mlttfamily,label=lst:q2,caption={分布因子与矫正控制题目3场景2}]{../q2s2.m}
     \label{applastpage}
 \iffalse
 \begin{itemize}[noitemsep,topsep=0pt]
