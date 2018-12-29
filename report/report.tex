@@ -17,7 +17,7 @@
     \subsection{题目1 算例解读}
     \paragraph{题目描述} 通过case30.m中的算例基本数据，明确各节点类型，分别说明在直角坐标和极坐标情况下的已知量和待求量都有哪些，形式上需要几个等式方程。
 
-    查询MATPOWER手册【TODO】可知，结构体中的bus属性对应的bus\_type区分了节点的类型，其中PQ节点值为1，PV节点值为2，参考节点值为3，孤立节点值为4。因此，可以通过以下程序统计各类型节点数量：
+    查询MATPOWER手册\cite{manual}可知，结构体中的bus属性对应的bus\_type区分了节点的类型，其中PQ节点值为1，PV节点值为2，参考节点值为3，孤立节点值为4。因此，可以通过以下程序统计各类型节点数量：
 
     \begin{lstlisting}[style=Matlab-editor,basicstyle=\mlttfamily]
 mpc = case30();
@@ -230,7 +230,7 @@ end
     \subsection{题目1 分布因子计算}
     \paragraph{题目描述} 试用课本上学习的方法计算发电机输出功率转移分布因子，并与makePTDF函数的计算结果进行比对。
 
-    根据教材【TODO】，分布因子的计算公式为
+    根据教材\cite{教材}，分布因子的计算公式为
     \begin{equation}
       \label{eq:fbyz}
       \begin{aligned}
