@@ -267,7 +267,58 @@ Calc error: 1.523481e-14
     \subsection{题目2 边界条件变化估算}
     \paragraph{题目描述} 利用分布因子方法估算潮流方程边界条件发生变化时的各线路潮流分布情况，并与在调整后边界条件下的潮流计算结果进行对比，探讨其中的差别与产生的原因。请根据以下场景进行计算：
     \subsubsection{场景1} 当位于2号节点的发电机有功出力减小0.1、1与10时。
+
+    设调整量为$p=-0.1,-1,-10$，则调整后线路潮流变化为
+    \begin{equation}
+      \Delta P_k = G_{k-2}p
+    \end{equation}
+    由于分布因子的计算是基于直流潮流模型的，线路首端与尾端的有功功率一致。而对于交流潮流而言，我们定义线路潮流为首尾潮流的均值，
+    \begin{equation}
+      P_k = \frac{1}{2}(P_k^F-P_k^T)
+    \end{equation}
+    其中$P_k^F$为线路首端注入有功，$P_k^T$为线路尾端注入有功，注意由于方向的定义，此处均值中为减号。
+
+    根据此定义，撰写程序计算潮流改变量，并与直接调整发电机功率后潮流计算的结果进行对比，程序见附录，如\cref{lst:q1s1}所示，并采用主程序调用，结果如下。其中误差采用无穷范数进行衡量，定义为\cref{eq:error}。
+    \begin{equation}
+      \label{eq:error}
+      Err_p = \parallel\frac{P_k + G_{k-2}p - P_k'}{P_k'}\parallel_\infty \times 100\%
+    \end{equation}
+    \begin{lstlisting}[style=Matlab-editor,basicstyle=\mlttfamily]
+-0.1 Error: 0.00%
+-1 Error: 0.01%
+-10 Error: 0.12%
+    \end{lstlisting}
+
+    可以看到，随着调整量的增加，采用分布因子的计算方法相对误差不断增大。这是由于分布因子方法采用了直流潮流模型，忽略了系统网损，也忽略了系统的非线性。当调整量较小时，局部线性化的精度较高，因此该方法的估计准确度高；而当调整量较大时，非线性体现明显，局部线性化误差较大，因此该方法估计准确度降低。同时，即便在最大调整量10时，相对误差实际也并不大，这表明在2号节点处，当前状态下的潮流方程对2号节点有功功率的曲率不大，线性程度高。
+
+    为了观察误差的分布情况，我们定义相对调整误差为\cref{eq:error1}，该指标可以反映不同支路上调整误差的分布，针对本场景的三种情况，对\cref{eq:error1}作图如\cref{fig:q1s1}所示。可见，调整误差分布基本一致，这也说明系统线性化程度较高。
+    \begin{equation}
+      \label{eq:error1}
+      Err_p' = \parallel\frac{P_k + G_{k-2}p - P_k'}{P_k'p}\parallel_\infty \times 100\%
+    \end{equation}
+    \begin{figure}[htbp]
+      \includegraphics[width=0.95\linewidth]{../meta/q1s1}
+      \caption{场景1相对调整误差分布}
+      \label{fig:q1s1}
+    \end{figure}
     \subsubsection{场景2} 当位于2号节点的发电机有功出力减小0.1、1与10且位于13号节点的发电机有功出力相应增加0.1、1与10以使系统总调整量为0时。
+
+    采用同样的方法，将分布因子计算结果与潮流计算结果对比，得到偏差如下。计算相对调整误差，并绘制分布，如\cref{fig:q1s2}所示。
+    \begin{lstlisting}[style=Matlab-editor,basicstyle=\mlttfamily]
+-0.1 Error: 0.11%
+-1 Error: 1.09%
+-10 Error: 19.83%
+    \end{lstlisting}
+
+    \begin{figure}[htbp]
+      \includegraphics[width=0.95\linewidth]{../meta/q1s2}
+      \caption{场景2相对调整误差分布}
+      \label{fig:q1s2}
+    \end{figure}
+
+    可见，随着调整量的增加，误差不断增大，这是与场景1类似的，原因也是修正量过大使线性化逐渐失效。不同的是，在\cref{fig:q1s2}中，相对调整误差分布随着调整量的增大逐渐变化。特别地，在调整10的情况下，相对误差已经接近20\%。这是由于系统非线性程度高，在不同的调整量下体现出不同的偏差特性。从物理上来讲，当发电机功率大幅调整，会引起网络潮流分布的变化，线路网损也有所增减，因而采用直流潮流进行估计误差较大。
+
+    对比场景1可见，在节点13处使用分布因子的误差，要远大于节点2处。这意味着潮流方程在节点13处的曲率要远大于节点2处的曲率。此案例告诉我们，使用分布因子的精确程度与具体的节点有关。
 
     \subsection{题目3 矫正控制策略}
     \paragraph{题目描述} 利用分布因子方法计算为达到所期望的控制效果所需的矫正控制策略，并与在调整后边界条件下的潮流计算结果进行对比，探讨两者的差别与产生的原因。请根据以下场景进行计算：
@@ -280,6 +331,8 @@ Calc error: 1.523481e-14
     \section{程序清单}
       \lstinputlisting[style=Matlab-editor,basicstyle=\mlttfamily,label=lst:hwtask,caption={全部作业任务}]{../hwtask.m}
       \lstinputlisting[style=Matlab-editor,basicstyle=\mlttfamily,label=lst:expPTDF,caption={发电机有功功率转移分布因子计算}]{../expPTDF.m}
+      \lstinputlisting[style=Matlab-editor,basicstyle=\mlttfamily,label=lst:q1s1,caption={分布因子与矫正控制题目2场景1}]{../q1s1.m}
+      \lstinputlisting[style=Matlab-editor,basicstyle=\mlttfamily,label=lst:q1s2,caption={分布因子与矫正控制题目2场景2}]{../q1s2.m}
     \label{applastpage}
 \iffalse
 \begin{itemize}[noitemsep,topsep=0pt]

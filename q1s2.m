@@ -26,4 +26,6 @@ cbrp = - p * ptdf(:, node) + p * ptdf(:, node1);
 r = abs((cbrp - mbrp) ./ branchp(mdres));
 r(r == Inf) = 0;
 maxr = max(r);
+
+stem(r / abs(p));
 end
