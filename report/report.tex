@@ -350,10 +350,21 @@ Error: 6.96%
 [maxdf, maxdfgen] = max(exp_ptdf(abr, md.gen(:, GEN_BUS)));
 [mindf, mindfgen] = min(exp_ptdf(abr, md.gen(:, GEN_BUS)));
     \end{lstlisting}
-    计算这种调节方式带来的误差，结果为6.94\%。
+    选取结果为2号发电机和4号发电机，调节量为0.16。计算这种调节方式带来的误差，结果为6.94\%。由于2号发电机的分布因子很小，实际上误差主要取决于4号发电机即27号节点，因此结果同场景1类似。
 
-    当然，根据我们在
+    当然，由于我们已经得到了交流潮流方程，因此我们实际上是可以评估任意一对节点的调整效果的。由于发电机数目在本例中并不大，我们完全可以遍历所有的节点组合情况，得到一个“分布因子控制偏差矩阵”。
+    \begin{lstlisting}[style=Matlab-editor,basicstyle=\mlttfamily]
+ngen = size(res.gen, 1);
+rp = zeros(ngen, ngen);
+for i = 1:ngen
+    for j = (i + 1):ngen
+        rp(i, j) = q2s2(res, i, j, abr, exp_ptdf);
+        rp(j, i) = rp(i, j);
+    end
+end
+    \end{lstlisting}
 
+    此时我们查找最优的点对策略，发现为2号节点与5号节点，调节量为0.65，误差为-3.18\%。这种搜索法在实际的调节场合中也是可以应用的，我们可以离线生成这样的分布因子控制偏差矩阵，并储存各个线路调节的节点对。在需要在线调节时，直接调取即可。当然，这种最优误差的节点对会使得发电机调节量更大，因此需要根据场合合理选择。
     \bibliography{report}
     \bibliographystyle{ieeetr}
     \appendix

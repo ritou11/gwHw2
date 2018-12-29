@@ -18,11 +18,5 @@ fprintf('ÇëÉè¼ÆÒ»ÖÖ·½°¸£¬Ñ¡È¡Ò»¶Ô½Úµã²¢Í¬Ê±µ÷½Ú½ÚµãÉÏ·¢µç»ú¶ÔµÄÓÐ¹¦³öÁ¦£¬ÒÔÊ¹ÏßÂ
 md = res;
 [maxdf, maxdfgen] = max(exp_ptdf(abr, md.gen(:, GEN_BUS)));
 [mindf, mindfgen] = min(exp_ptdf(abr, md.gen(:, GEN_BUS)));
-adj = -0.1 / (maxdf - mindf);
-md.gen(maxdfgen, PG) = md.gen(maxdfgen, PG) + adj;
-md.gen(mindfgen, PG) = md.gen(mindfgen, PG) - adj;
-mdres = runpf(md, mpoption('pf.alg', 'nr','verbose', 0));
-dbrp = (mdres.branch(abr, PF) - mdres.branch(abr, PT) ...
-    - (res.branch(abr, PF) - res.branch(abr, PT))) / 2;
-err = (dbrp + 0.1) / -0.1;
-fprintf('Error: %.2f%%\n', err * 100);
+[err, adj] = q2s2(res, maxdfgen, mindfgen, abr, exp_ptdf);
+fprintf('Adj = %.2f; Error: %.2f%%\n', adj, err * 100);

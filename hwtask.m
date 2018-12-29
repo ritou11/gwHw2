@@ -48,9 +48,11 @@ saveas(fig, 'meta/q1s2.png');
 close(fig);
 %% Q2
 q2;
-rp = zeros(6,6);
-for i = 1:6
-    for j = (i + 1):6
+ngen = size(res.gen, 1);
+rp = zeros(ngen, ngen);
+for i = 1:ngen
+    for j = (i + 1):ngen
         rp(i, j) = q2s2(res, i, j, abr, exp_ptdf);
+        rp(j, i) = rp(i, j);
     end
 end
